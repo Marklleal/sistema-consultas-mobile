@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
   TextInput,
   Button,
   ScrollView,
-  Alert,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   obterEspecialidades,
   obterMedicos,
@@ -21,12 +21,15 @@ import { Medico } from "../interfaces/medico";
 import { Paciente } from "../types/paciente";
 import { Consulta } from "../interfaces/consulta";
 import { styles } from "../styles/admin.styles";
+import { useToast } from "../components";
 
 export default function Admin({
   navigation,
 }: {
   navigation: { navigate: (screen: string) => void };
 }) {
+  const mostrarToast = useToast();
+
   const [nomeEsp, setNomeEsp] = useState("");
   const [descEsp, setDescEsp] = useState("");
   const [especialidades, setEspecialidades] = useState<Especialidade[]>([]);
@@ -38,9 +41,11 @@ export default function Admin({
   const [nomePac, setNomePac] = useState("");
   const [dataConsulta, setDataConsulta] = useState("");
 
-  useEffect(() => {
-    carregarDados();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      carregarDados();
+    }, [])
+  );
 
   async function carregarDados() {
     const especialidadesSalvas = await obterEspecialidades();
@@ -49,9 +54,9 @@ export default function Admin({
     setMedicos(medicosSalvos);
   }
 
-  function adicionarEspecialidade() {
+  async function adicionarEspecialidade() {
     if (!nomeEsp || !descEsp) {
-      Alert.alert("Erro", "Preencha nome e descrição");
+      mostrarToast("Preencha nome e descrição", "erro");
       return;
     }
 
@@ -63,21 +68,21 @@ export default function Admin({
 
     const novasEsps = [...especialidades, novaEsp];
     setEspecialidades(novasEsps);
-    salvarEspecialidades(novasEsps);
+    await salvarEspecialidades(novasEsps);
 
     setNomeEsp("");
     setDescEsp("");
-    Alert.alert("Sucesso", "Especialidade adicionada!");
+    mostrarToast("Especialidade adicionada!", "sucesso");
   }
 
-  function adicionarMedico() {
+  async function adicionarMedico() {
     if (!nomeMed || !crmMed) {
-      Alert.alert("Erro", "Preencha nome e CRM");
+      mostrarToast("Preencha nome e CRM", "erro");
       return;
     }
 
     if (especialidades.length === 0) {
-      Alert.alert("Erro", "Adicione uma especialidade primeiro!");
+      mostrarToast("Adicione uma especialidade primeiro!", "erro");
       return;
     }
 
@@ -91,21 +96,21 @@ export default function Admin({
 
     const novosMeds = [...medicos, novoMed];
     setMedicos(novosMeds);
-    salvarMedicos(novosMeds);
+    await salvarMedicos(novosMeds);
 
     setNomeMed("");
     setCrmMed("");
-    Alert.alert("Sucesso", "Médico adicionado!");
+    mostrarToast("Médico adicionado!", "sucesso");
   }
 
   async function criarConsultaTeste() {
     if (!nomePac || !dataConsulta) {
-      Alert.alert("Erro", "Preencha nome do paciente e data");
+      mostrarToast("Preencha nome do paciente e data", "erro");
       return;
     }
 
     if (medicos.length === 0) {
-      Alert.alert("Erro", "Adicione um médico primeiro!");
+      mostrarToast("Adicione um médico primeiro!", "erro");
       return;
     }
 
@@ -119,7 +124,7 @@ export default function Admin({
 
     const partesData = dataConsulta.split("/");
     if (partesData.length !== 3) {
-      Alert.alert("Erro", "Use a data no formato DD/MM/AAAA");
+      mostrarToast("Use a data no formato DD/MM/AAAA", "erro");
       return;
     }
 
@@ -127,7 +132,7 @@ export default function Admin({
     const data = new Date(Number(ano), Number(mes) - 1, Number(dia));
 
     if (Number.isNaN(data.getTime())) {
-      Alert.alert("Erro", "Data inválida. Use DD/MM/AAAA");
+      mostrarToast("Data inválida. Use DD/MM/AAAA", "erro");
       return;
     }
 
@@ -147,9 +152,8 @@ export default function Admin({
     setNomePac("");
     setDataConsulta("");
 
-    Alert.alert("Sucesso", "Consulta criada! Volte para Home", [
-      { text: "OK", onPress: () => navigation.navigate("Home") },
-    ]);
+    mostrarToast("Consulta criada! Volte para Home", "sucesso");
+    setTimeout(() => navigation.navigate("Home"), 1500);
   }
 
   return (
