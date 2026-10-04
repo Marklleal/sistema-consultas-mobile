@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from "react";
-import { View, Text, StyleSheet, Animated, Easing } from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Pressable, StyleSheet, Text } from "react-native";
 
 type ToastType = "sucesso" | "erro" | "info";
 
@@ -16,79 +16,31 @@ const CORES = {
   info: { bg: "#E3F2FD", border: "#2196F3", texto: "#1565C0" },
 };
 
-export function Toast({ visivel, mensagem, tipo, onClose }: ToastProps) {
-  const [animacao, setAnimacao] = useState(new Animated.Value(0));
-  const [opacidade, setOpacidade] = useState(new Animated.Value(0));
-
-  const mostrar = useCallback(() => {
-    setAnimacao(new Animated.Value(0));
-    setOpacidade(new Animated.Value(0));
-
-    Animated.parallel([
-      Animated.timing(animacao, {
-        toValue: 1,
-        duration: 300,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacidade, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [animacao, opacidade]);
-
-  const esconder = useCallback(() => {
-    Animated.parallel([
-      Animated.timing(animacao, {
-        toValue: 0,
-        duration: 200,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacidade, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      onClose();
-    });
-  }, [animacao, opacidade, onClose]);
-
-  React.useEffect(() => {
-    if (visivel) {
-      mostrar();
-    } else {
-      esconder();
-    }
-  }, [visivel, mostrar, esconder]);
-
-  const translateY = animacao.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-50, 0],
-  });
+function Toast({ visivel, mensagem, tipo, onClose }: ToastProps) {
+  if (!visivel) return null;
 
   const cores = CORES[tipo];
 
   return (
-    <Animated.View
-      style={[
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={mensagem}
+      onPress={onClose}
+      style={({ pressed }) => [
         styles.container,
         { backgroundColor: cores.bg, borderLeftColor: cores.border },
-        { opacity: opacidade, transform: [{ translateY }] },
+        pressed && styles.pressionado,
       ]}
     >
       <Text style={[styles.texto, { color: cores.texto }]}>{mensagem}</Text>
-    </Animated.View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     position: "absolute",
-    top: 60,
+    top: 100,
     left: 16,
     right: 16,
     padding: 16,
@@ -100,6 +52,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     zIndex: 1000,
+    cursor: "pointer",
+  },
+  pressionado: {
+    opacity: 0.85,
   },
   texto: {
     fontSize: 14,
@@ -114,18 +70,32 @@ type ToastContextType = {
 const ToastContext = React.createContext<ToastContextType | null>(null);
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
-  const [toast, setToast] = useState<{ visivel: boolean; mensagem: string; tipo: ToastType }>({
-    visivel: false,
-    mensagem: "",
-    tipo: "info",
-  });
-
-  const mostrarToast = useCallback((mensagem: string, tipo: ToastType) => {
-    setToast({ visivel: true, mensagem, tipo });
-  }, []);
+  const [toast, setToast] = useState<{
+    visivel: boolean;
+    mensagem: string;
+    tipo: ToastType;
+  }>({ visivel: false, mensagem: "", tipo: "info" });
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const esconderToast = useCallback(() => {
-    setToast((prev) => ({ ...prev, visivel: false }));
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = null;
+    setToast((atual) => ({ ...atual, visivel: false }));
+  }, []);
+
+  const mostrarToast = useCallback((mensagem: string, tipo: ToastType) => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setToast({ visivel: true, mensagem, tipo });
+    timeoutRef.current = setTimeout(() => {
+      setToast((atual) => ({ ...atual, visivel: false }));
+      timeoutRef.current = null;
+    }, 4000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
   }, []);
 
   return (
